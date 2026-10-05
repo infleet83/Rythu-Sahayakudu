@@ -15,21 +15,44 @@ supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- 2. USER AUTHENTICATION (Google Login) ---
-# Streamlit Cloud supports user login via st.user
-if not st.user.is_logged_in:
-    st.title("🌾 Rythu Sahayakudu (రైతు సహాయకుడు)")
-    st.caption("Developed by **Yaswanth Chowdary** | Free AI Agricultural Assistant")
-    st.markdown("---")
-    st.info("👋 Welcome! Please log in with your Google account to save your conversation history and access personalized farming advice.")
-    
-    if st.button("🔑 Log in with Google / Gmail", type="primary"):
-        st.login()
-    st.stop()
+# --- 2. USER AUTHENTICATION & IDENTITY ---
+# Check if Streamlit native user auth is active; otherwise fall back to session user
+user_logged_in = False
+user_email = ""
+user_name = ""
 
-# Get logged-in user details
-user_email = st.user.email
-user_name = st.user.name
+try:
+    if hasattr(st, "user") and getattr(st.user, "is_logged_in", False):
+        user_logged_in = True
+        user_email = st.user.email
+        user_name = st.user.name
+except Exception:
+    user_logged_in = False
+
+# Fallback: simple session-based email input if st.user is unavailable
+if not user_logged_in:
+    if "user_email" not in st.session_state:
+        st.session_state.user_email = ""
+        st.session_state.user_name = ""
+
+    if not st.session_state.user_email:
+        st.title("🌾 Rythu Sahayakudu (రైతు సహాయకుడు)")
+        st.caption("Developed by **Yaswanth Chowdary** | Free AI Agricultural Assistant")
+        st.markdown("---")
+        st.info("👋 Welcome! Please enter your email or name to load and save your conversation history.")
+        
+        input_email = st.text_input("Enter your Email ID or Phone Number:", placeholder="farmer@gmail.com")
+        if st.button("🚀 Continue to App", type="primary"):
+            if input_email.strip():
+                st.session_state.user_email = input_email.strip()
+                st.session_state.user_name = input_email.split("@")[0].capitalize()
+                st.rerun()
+            else:
+                st.warning("Please enter a valid identifier.")
+        st.stop()
+    else:
+        user_email = st.session_state.user_email
+        user_name = st.session_state.user_name
 
 # --- 3. UI TRANSLATIONS DICTIONARY (22+ LANGUAGES) ---
 UI_TRANSLATIONS = {
