@@ -3,10 +3,9 @@ from gtts import gTTS
 import google.generativeai as genai
 import os
 
-# Page title & config
 st.set_page_config(page_title="Rythu Sahayakudu", page_icon="🌾")
 
-# 1. UI Translations Dictionary for Supported Languages
+# 1. UI Translations Dictionary
 UI_TRANSLATIONS = {
     "Telugu (తెలుగు)": {
         "code": "te",
@@ -14,16 +13,17 @@ UI_TRANSLATIONS = {
         "caption": "తయారు చేసినవారు: **యాస్వంత్ చౌదరి** | ఉచిత ఏఐ వ్యవసాయ సహాయకుడు",
         "select_lang": "భాషను ఎంచుకోండి:",
         "choose_mode": "ఇన్‌పుట్ మార్గాన్ని ఎంచుకోండి:",
-        "mode_voice": "🎙️️ వాయిస్ ద్వారా (మాట్లాడండి)",
+        "mode_voice": "🎙️ వాయిస్ ద్వారా (మాట్లాడండి)",
         "mode_text": "✍️ టైప్ చేయడం ద్వారా",
-        "voice_info": "కింది మైక్రోఫోన్ బటన్ నొక్కి మీ వ్యవసాయ ప్రశ్నను స్పష్టంగా చెప్పండి:",
-        "text_placeholder": "ఉదాహరణ: వరి చేనులో ఆకులు పసుపు రంగులోకి మారుతున్నాయి, ఏమి చేయాలి?",
-        "btn_submit": "🤖 ఉచిత ఏఐ సలహా పొందండి & వినండి",
+        "voice_info": "మైక్ బటన్ నొక్కి మీ వ్యవసాయ ప్రశ్న లేదా తదుపరి ప్రశ్న (Follow-up) మాట్లాడండి:",
+        "text_placeholder": "మీ వ్యవసాయ ప్రశ్న లేదా తదుపరి ప్రశ్నను ఇక్కడ టైప్ చేయండి...",
+        "btn_submit": "🤖 ఏఐ సలహా పొందండి & వినండి",
+        "btn_clear": "🔄 క్రొత్త సంభాషణ ప్రారంభించండి (Clear Chat)",
         "err_key": "దయచేసి Streamlit Secrets లో GEMINI_API_KEY నమోదు చేయండి!",
         "err_voice": "దయచేసి ముందుగా మీ ప్రశ్నను రికార్డ్ చేయండి!",
         "err_text": "దయచేసి ముందుగా మీ ప్రశ్నను టైప్ చేయండి!",
-        "spinner": "ఏఐ మీ వ్యవసాయ ప్రశ్నను విశ్లేషిస్తోంది...",
-        "advice_header": "💡 వ్యవసాయ సలహా:",
+        "spinner": "ఏఐ మీ ప్రశ్నను విశ్లేషిస్తోంది...",
+        "chat_history_header": "💬 సంభాషణ చరిత్ర (Conversation History):",
         "footer": "© 2026 **యాస్వంత్ చౌదరి** | భారతీయ రైతులకు అంకితం"
     },
     "Hindi (हिन्दी)": {
@@ -34,51 +34,16 @@ UI_TRANSLATIONS = {
         "choose_mode": "इनपुट का तरीका चुनें:",
         "mode_voice": "🎙️ आवाज़ द्वारा (बोलें)",
         "mode_text": "✍️ लिखकर (टाइप करें)",
-        "voice_info": "नीचे दिए गए माइक बटन को दबाएं और अपना कृषि प्रश्न स्पष्ट रूप से बोलें:",
-        "text_placeholder": "उदाहरण: धान के पत्तों में पीलापन आ रहा है, क्या करें?",
+        "voice_info": "माइक बटन दबाएं और अपना प्रश्न या अगला सवाल (Follow-up) बोलें:",
+        "text_placeholder": "अपना प्रश्न या अगला सवाल यहाँ लिखें...",
         "btn_submit": "🤖 एआई सलाह प्राप्त करें और सुनें",
+        "btn_clear": "🔄 नई बातचीत शुरू करें (Clear Chat)",
         "err_key": "कृपया Streamlit Secrets में GEMINI_API_KEY जोड़ें!",
         "err_voice": "कृपया पहले अपनी आवाज़ रिकॉर्ड करें!",
         "err_text": "कृपया पहले अपना प्रश्न लिखें!",
-        "spinner": "एआई आपके कृषि प्रश्न का विश्लेषण कर रहा है...",
-        "advice_header": "💡 कृषि सलाह:",
+        "spinner": "एआई आपके प्रश्न का विश्लेषण कर रहा है...",
+        "chat_history_header": "💬 बातचीत का इतिहास (Conversation History):",
         "footer": "© 2026 **यसवंत चौधरी** | भारतीय किसानों को समर्पित"
-    },
-    "Tamil (தமிழ்)": {
-        "code": "ta",
-        "title": "🌾 உழவன் உதவியாளர் (Rythu Sahayakudu)",
-        "caption": "உருவாக்கியவர்: **யஷ்வந்த் சவுத்ரி** | இலவச AI விவசாய உதவியாளர்",
-        "select_lang": "மொழியைத் தேர்ந்தெடுக்கவும்:",
-        "choose_mode": "உள்ளீட்டு முறையைத் தேர்ந்தெடுக்கவும்:",
-        "mode_voice": "🎙️ குரல் மூலம் (பேசவும்)",
-        "mode_text": "✍️ தட்டச்சு மூலம்",
-        "voice_info": "மைக்கை அழுத்தி உங்கள் விவசாயக் கேள்வியைப் பேசுங்கள்:",
-        "text_placeholder": "எடுத்துக்காட்டு: நெல் பயிரில் இலைகள் மஞ்சளாக மாறினால் என்ன செய்வது?",
-        "btn_submit": "🤖 AI ஆலோசனையைப் பெற்று கேட்கவும்",
-        "err_key": "Streamlit Secrets இல் GEMINI_API_KEY ஐச் சேர்க்கவும்!",
-        "err_voice": "தயவுசெய்து முதலில் உங்கள் குரலைப் பதிவு செய்யவும்!",
-        "err_text": "தயவுசெய்து முதலில் உங்கள் கேள்வியைத் தட்டச்சு செய்யவும்!",
-        "spinner": "AI உங்கள் கேள்வியை பகுப்பாய்வு செய்கிறது...",
-        "advice_header": "💡 விவசாய ஆலோசனை:",
-        "footer": "© 2026 **யஷ்வந்த் சவுத்ரி** | இந்திய விவசாயிகளுக்கு அர்ப்பணிக்கப்பட்டது"
-    },
-    "Kannada (ಕನ್ನಡ)": {
-        "code": "kn",
-        "title": "🌾 ರೈತ ಸಹಾಯಕ (Rythu Sahayakudu)",
-        "caption": "ರೂಪಿಸಿದವರು: **ಯಶವಂತ್ ಚೌಧರಿ** | ಉಚಿತ AI ಕೃಷಿ ಸಹಾಯಕ",
-        "select_lang": "ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ:",
-        "choose_mode": "ಇನ್‌ಪುಟ್ ವಿಧಾನವನ್ನು ಆಯ್ಕೆಮಾಡಿ:",
-        "mode_voice": "🎙️ ಧ್ವನಿ ಮೂಲಕ (ಮಾತನಾಡಿ)",
-        "mode_text": "✍️ ಟೈಪ್ ಮಾಡುವ ಮೂಲಕ",
-        "voice_info": "ಮೈಕ್ ಬಟನ್ ಒತ್ತಿ ನಿಮ್ಮ ಕೃಷಿ ಪ್ರಶ್ನೆಯನ್ನು ಸ್ಪಷ್ಟವಾಗಿ ಮಾತನಾಡಿ:",
-        "text_placeholder": "ಉದಾಹರಣೆಗೆ: ಭತ್ತದ ಎಲೆಗಳು ಹಳದಿಯಾಗುತ್ತಿವೆ, ಏನು ಮಾಡಬೇಕು?",
-        "btn_submit": "🤖 AI ಸಲಹೆ ಪಡೆಯಿರಿ ಮತ್ತು ಆಲಿಸಿ",
-        "err_key": "Streamlit Secrets ನಲ್ಲಿ GEMINI_API_KEY ಸೇರಿಸಿ!",
-        "err_voice": "ದಯವಿಟ್ಟು ಮೊದಲು ನಿಮ್ಮ ಧ್ವನಿಯನ್ನು ರೆಕಾರ್ಡ್ ಮಾಡಿ!",
-        "err_text": "ದಯವಿಟ್ಟು ಮೊದಲು ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಟೈಪ್ ಮಾಡಿ!",
-        "spinner": "AI ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ವಿಶ್ಲೇಷಿಸುತ್ತಿದೆ...",
-        "advice_header": "💡 ಕೃಷಿ ಸಲಹೆ:",
-        "footer": "© 2026 **ಯಶವಂತ್ ಚೌಧರಿ** | ಭಾರತೀಯ ರೈತರಿಗೆ ಅರ್ಪಿತ"
     },
     "English": {
         "code": "en",
@@ -88,35 +53,54 @@ UI_TRANSLATIONS = {
         "choose_mode": "Choose Input Method:",
         "mode_voice": "🎙️ Voice Input (Record Audio)",
         "mode_text": "✍️ Text Input (Type)",
-        "voice_info": "Tap the microphone below and speak your farming question clearly:",
-        "text_placeholder": "e.g., How to treat leaf yellowing in paddy crop?",
+        "voice_info": "Tap the mic button and speak your question or follow-up:",
+        "text_placeholder": "Type your question or follow-up here...",
         "btn_submit": "🤖 Get AI Advice & Listen",
+        "btn_clear": "🔄 Start New Conversation",
         "err_key": "Please add your GEMINI_API_KEY to Streamlit Secrets!",
         "err_voice": "Please record a voice message first!",
         "err_text": "Please type a question first!",
-        "spinner": "AI is analyzing your farming query...",
-        "advice_header": "💡 Farming Advice:",
+        "spinner": "AI is analyzing your query...",
+        "chat_history_header": "💬 Conversation History:",
         "footer": "© 2026 **Yaswanth Chowdary** | Dedicated to Indian Farmers"
     }
 }
 
-# 2. Language Selection Dropdown
+# Select Language
 selected_lang_name = st.selectbox(
     "Select Language / భాషను ఎంచుకోండి / भाषा चुनें:", 
     list(UI_TRANSLATIONS.keys())
 )
 
-# Fetch translated UI strings for chosen language
 t = UI_TRANSLATIONS[selected_lang_name]
 lang_code = t["code"]
 
-# Header & Creator Credit (Translated)
+# Render Header
 st.title(t["title"])
 st.caption(t["caption"])
+st.markdown("---")
+
+# Initialize Chat Memory in Session State
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Button to reset chat session
+if st.button(t["btn_clear"]):
+    st.session_state.messages = []
+    st.rerun()
+
+# Display Chat History
+if st.session_state.messages:
+    st.markdown(f"### {t['chat_history_header']}")
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.write(msg["content"])
+            if "audio" in msg and msg["audio"]:
+                st.audio(msg["audio"], format="audio/mp3")
 
 st.markdown("---")
 
-# Input Method Selection (Translated)
+# Input Mode Choice
 input_mode_choice = st.radio(
     t["choose_mode"], 
     [t["mode_voice"], t["mode_text"]]
@@ -127,11 +111,10 @@ text_file_input = ""
 
 if input_mode_choice == t["mode_voice"]:
     st.info(t["voice_info"])
-    audio_file_input = st.audio_input("Record Audio")
+    audio_file_input = st.audio_input("Record Audio / వాయిస్ రికార్డ్ చేయండి")
 else:
-    text_file_input = st.text_area("Type Question:", placeholder=t["text_placeholder"])
+    text_file_input = st.text_area("Question / Follow-up:", placeholder=t["text_placeholder"])
 
-# Fetch API Key securely
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
 
 if st.button(t["btn_submit"], type="primary"):
@@ -147,7 +130,17 @@ if st.button(t["btn_submit"], type="primary"):
                 genai.configure(api_key=GEMINI_API_KEY)
                 model = genai.GenerativeModel('gemini-1.5-flash')
 
-                system_prompt = f"You are an agricultural expert helping an Indian farmer. Answer clearly, simply, and directly in {selected_lang_name} language."
+                # System context prompt
+                system_instruction = (
+                    f"You are an agricultural expert named Rythu Sahayakudu created by Yaswanth Chowdary. "
+                    f"You are conversing with an Indian farmer in {selected_lang_name}. "
+                    f"Keep your response concise, helpful, and directly in {selected_lang_name}."
+                )
+
+                # Format conversation history for Gemini context
+                history_prompt = system_instruction + "\n\nConversation so far:\n"
+                for m in st.session_state.messages:
+                    history_prompt += f"{m['role'].capitalize()}: {m['content']}\n"
 
                 if input_mode_choice == t["mode_voice"]:
                     audio_bytes = audio_file_input.read()
@@ -155,30 +148,34 @@ if st.button(t["btn_submit"], type="primary"):
                         "mime_type": audio_file_input.type,
                         "data": audio_bytes
                     }
-                    response = model.generate_content([system_prompt, audio_data])
+                    prompt_parts = [history_prompt, "Farmer's new audio question:", audio_data]
+                    response = model.generate_content(prompt_parts)
+                    user_msg_text = "🎙️ [Voice Question Received]"
                 else:
-                    response = model.generate_content(f"{system_prompt}\nFarmer Question: {text_file_input}")
+                    prompt_parts = f"{history_prompt}\nFarmer's new question: {text_file_input}"
+                    response = model.generate_content(prompt_parts)
+                    user_msg_text = text_file_input
 
                 advice_text = response.text
 
-                # Display Text Advice (Translated Header)
-                st.markdown(f"### {t['advice_header']}")
-                st.write(advice_text)
-
-                # Convert text answer to spoken audio
-                audio_output_path = "advice_output.mp3"
+                # Generate TTS for AI response
+                audio_filename = f"response_{len(st.session_state.messages)}.mp3"
                 try:
                     tts = gTTS(text=advice_text, lang=lang_code, slow=False)
-                    tts.save(audio_output_path)
+                    tts.save(audio_filename)
                 except Exception:
                     tts = gTTS(text=advice_text, lang="en", slow=False)
-                    tts.save(audio_output_path)
+                    tts.save(audio_filename)
 
-                st.audio(audio_output_path, format="audio/mp3")
+                # Store user message and AI response in session history
+                st.session_state.messages.append({"role": "user", "content": user_msg_text})
+                st.session_state.messages.append({"role": "assistant", "content": advice_text, "audio": audio_filename})
+
+                st.rerun()
 
             except Exception as e:
-                st.error(f"Error processing query: {str(e)}")
+                st.error(f"Error: {str(e)}")
 
-# Footer Credit (Translated)
+# Footer
 st.divider()
 st.markdown(t["footer"])
