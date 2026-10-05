@@ -6,13 +6,13 @@ import os
 # Page title & config
 st.set_page_config(page_title="Rythu Sahayakudu", page_icon="🌾")
 
-# 1. Indian Languages Supported
+# 1. Indian Languages
 LANGUAGES = {
     "Telugu (తెలుగు)": "te",
     "Hindi (हिन्दी)": "hi",
     "Bengali (বাংলা)": "bn",
     "Tamil (தமிழ்)": "ta",
-    "Kannada (ಕನ್ನಡ)": "kn",
+    "Kannada (కನ್ನಡ)": "kn",
     "Marathi (मరాఠీ)": "mr",
     "Gujarati (ગુજરાતી)": "gu",
     "Malayalam (മലയാളം)": "ml",
@@ -20,7 +20,7 @@ LANGUAGES = {
     "Urdu (اردو)": "ur"
 }
 
-# Header and Creator Credit
+# Header & Credits
 st.title("🌾 Rythu Sahayakudu (రైతు సహాయకుడు)")
 st.caption("Developed by **Yaswanth Chowdary** | Free Open-Source AI Farming Assistant")
 
@@ -28,44 +28,69 @@ st.caption("Developed by **Yaswanth Chowdary** | Free Open-Source AI Farming Ass
 selected_lang_name = st.selectbox("Select Language / భాషను ఎంచుకోండి:", list(LANGUAGES.keys()))
 lang_code = LANGUAGES[selected_lang_name]
 
-# User Input
-user_question = st.text_area("Ask Your Farming Question / మీ వ్యవసాయ ప్రశ్నను అడగండి:", placeholder="e.g., How to treat leaf yellowing in paddy?")
+st.markdown("---")
 
-# API Key check
+# Input Method Selection
+input_mode = st.radio("Choose Input Method / ఇన్‌పుట్ మార్గాన్ని ఎంచుకోండి:", ["🎙️ Voice Input (Record Audio)", "✍️ Text Input (Type)"])
+
+audio_file_input = None
+text_file_input = ""
+
+if input_mode == "🎙️ Voice Input (Record Audio)":
+    st.info("Tap the microphone below and speak your farming question clearly:")
+    audio_file_input = st.audio_input("Record your question")
+else:
+    text_file_input = st.text_area("Type your question here:", placeholder="e.g., How to treat leaf yellowing in paddy?")
+
+# Fetch API Key securely
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
 
-if st.button("🤖 Get AI Advice & Listen", type="primary"):
-    if not user_question.strip():
-        st.warning("Please enter a question first!")
+if st.button("🤖 Process Question & Listen Advice", type="primary"):
+    if not GEMINI_API_KEY:
+        st.error("Please add your GEMINI_API_KEY to Streamlit Secrets!")
+    elif input_mode == "🎙️ Voice Input (Record Audio)" and not audio_file_input:
+        st.warning("Please record a voice message first!")
+    elif input_mode == "✍️ Text Input (Type)" and not text_file_input.strip():
+        st.warning("Please type a question first!")
     else:
-        with st.spinner("Processing advice..."):
-            # Get AI response
-            if GEMINI_API_KEY:
+        with st.spinner("Gemini AI is analyzing your farming query..."):
+            try:
                 genai.configure(api_key=GEMINI_API_KEY)
                 model = genai.GenerativeModel('gemini-1.5-flash')
-                prompt = f"You are an agricultural expert helping an Indian farmer. Answer simply and directly in {selected_lang_name}: {user_question}"
+
+                # System instruction for farming domain
+                system_prompt = f"You are an agricultural expert helping an Indian farmer. Answer clearly, simply, and directly in {selected_lang_name}."
+
+                if input_mode == "🎙️ Voice Input (Record Audio)":
+                    # Pass the audio bytes directly to Gemini
+                    audio_bytes = audio_file_input.read()
+                    audio_data = {
+                        "mime_type": audio_file_input.type,
+                        "data": audio_bytes
+                    }
+                    response = model.generate_content([system_prompt, audio_data])
+                else:
+                    response = model.generate_content(f"{system_prompt}\nFarmer Question: {text_file_input}")
+
+                advice_text = response.text
+
+                # Display Text Advice
+                st.markdown("### 💡 Farming Advice:")
+                st.write(advice_text)
+
+                # Convert text answer to spoken audio
+                audio_output_path = "advice_output.mp3"
                 try:
-                    response = model.generate_content(prompt)
-                    advice_text = response.text
-                except Exception as e:
-                    advice_text = f"Error generating advice: {str(e)}"
-            else:
-                advice_text = f"Advice in {selected_lang_name} for: '{user_question}'\n\n(Note: Add GEMINI_API_KEY in Secrets for live AI responses)."
+                    tts = gTTS(text=advice_text, lang=lang_code, slow=False)
+                    tts.save(audio_output_path)
+                except Exception:
+                    tts = gTTS(text=advice_text, lang="en", slow=False)
+                    tts.save(audio_output_path)
 
-            # Show Text Answer
-            st.markdown("### 💡 Farming Advice:")
-            st.write(advice_text)
+                st.audio(audio_output_path, format="audio/mp3")
 
-            # Generate and Play Audio
-            audio_path = "advice.mp3"
-            try:
-                tts = gTTS(text=advice_text, lang=lang_code, slow=False)
-                tts.save(audio_path)
-            except Exception:
-                tts = gTTS(text=advice_text, lang="en", slow=False)
-                tts.save(audio_path)
-
-            st.audio(audio_path, format="audio/mp3")
+            except Exception as e:
+                st.error(f"Error processing with Gemini API: {str(e)}")
 
 # Footer Credit
 st.divider()
