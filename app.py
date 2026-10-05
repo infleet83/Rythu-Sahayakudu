@@ -13,10 +13,12 @@ SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", os.getenv("SUPABASE_KEY", ""))
 
 supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        st.error(f"Supabase Connection Error: {str(e)}")
 
 # --- 2. USER AUTHENTICATION & IDENTITY ---
-# Check if Streamlit native user auth is active; otherwise fall back to session user
 user_logged_in = False
 user_email = ""
 user_name = ""
@@ -29,7 +31,6 @@ try:
 except Exception:
     user_logged_in = False
 
-# Fallback: simple session-based email input if st.user is unavailable
 if not user_logged_in:
     if "user_email" not in st.session_state:
         st.session_state.user_email = ""
@@ -37,11 +38,11 @@ if not user_logged_in:
 
     if not st.session_state.user_email:
         st.title("🌾 Rythu Sahayakudu (రైతు సహాయకుడు)")
-        st.caption("Developed by **Yaswanth Chowdary** | Free AI Agricultural Assistant")
+        st.caption("Developed by **Yaswanth Chowdary** | Free Open-Source AI Agricultural Assistant")
         st.markdown("---")
-        st.info("👋 Welcome! Please enter your email or name to load and save your conversation history.")
+        st.info("👋 Welcome! Please enter your email or mobile number to save and load your conversation history.")
         
-        input_email = st.text_input("Enter your Email ID or Phone Number:", placeholder="farmer@gmail.com")
+        input_email = st.text_input("Enter Email ID or Phone Number:", placeholder="farmer@gmail.com")
         if st.button("🚀 Continue to App", type="primary"):
             if input_email.strip():
                 st.session_state.user_email = input_email.strip()
@@ -54,13 +55,12 @@ if not user_logged_in:
         user_email = st.session_state.user_email
         user_name = st.session_state.user_name
 
-# --- 3. UI TRANSLATIONS DICTIONARY (22+ LANGUAGES) ---
+# --- 3. UI TRANSLATIONS DICTIONARY (22 SCHEDULED INDIAN LANGUAGES + ENGLISH) ---
 UI_TRANSLATIONS = {
     "Telugu (తెలుగు)": {
         "code": "te",
         "title": "🌾 రైతు సహాయకుడు (Rythu Sahayakudu)",
         "caption": f"స్వాగతం, **{user_name}** | తయారు చేసినవారు: **యాస్వంత్ చౌదరి**",
-        "select_lang": "భాషను ఎంచుకోండి:",
         "choose_mode": "ఇన్‌పుట్ మార్గాన్ని ఎంచుకోండి:",
         "mode_voice": "🎙️ వాయిస్ ద్వారా (మాట్లాడండి)",
         "mode_text": "✍️ టైప్ చేయడం ద్వారా",
@@ -79,7 +79,6 @@ UI_TRANSLATIONS = {
         "code": "hi",
         "title": "🌾 किसान सहायक (Rythu Sahayakudu)",
         "caption": f"स्वागत है, **{user_name}** | विकासकर्ता: **यसवंत चौधरी**",
-        "select_lang": "भाषा चुनें:",
         "choose_mode": "इनपुट का तरीका चुनें:",
         "mode_voice": "🎙️ आवाज़ द्वारा (बोलें)",
         "mode_text": "✍️ लिखकर (टाइप करें)",
@@ -94,164 +93,126 @@ UI_TRANSLATIONS = {
         "spinner": "एआई आपके प्रश्न का विश्लेषण कर रहा है...",
         "footer": "© 2026 **यसवंत चौधरी** | भारतीय किसानों को समर्पित"
     },
-    "English": {
-        "code": "en",
-        "title": "🌾 Rythu Sahayakudu (Farmer Assistant)",
-        "caption": f"Welcome, **{user_name}** | Developed by **Yaswanth Chowdary**",
-        "select_lang": "Select Language:",
-        "choose_mode": "Choose Input Method:",
-        "mode_voice": "🎙️ Voice Input (Record Audio)",
-        "mode_text": "✍️️ Text Input (Type)",
-        "voice_info": "Tap the mic button and speak your farming question:",
-        "text_placeholder": "Type your farming question or follow-up here...",
-        "btn_submit": "🤖 Get AI Advice & Listen",
-        "btn_new_chat": "➕ Start New Chat",
-        "history_title": "📜 Previous Conversations",
-        "err_key": "Please add your GEMINI_API_KEY to Streamlit Secrets!",
-        "err_voice": "Please record a voice message first!",
-        "err_text": "Please type a question first!",
-        "spinner": "AI is analyzing your query...",
-        "footer": "© 2026 **Yaswanth Chowdary** | Dedicated to Indian Farmers"
-    }
-}
-
-# --- 4. SIDEBAR: USER PROFILE & CHAT HISTORY ---
-with st.sidebar:
-    st.write(f"👤 **{user_name}**")
-    st.caption(f"📧 {user_email}")
-    if st.button("🚪 Log out"):
-        st.logout()
-
-    st.markdown("---")
-
-    selected_lang_name = st.selectbox(
-        "🌐 Select Language / భాషను ఎంచుకోండి:", 
-        list(UI_TRANSLATIONS.keys())
-    )
-    t = UI_TRANSLATIONS.get(selected_lang_name, UI_TRANSLATIONS["English"])
-    lang_code = t["code"]
-
-    st.markdown("---")
-    st.subheader(t["history_title"])
-
-    # Load Saved Sessions from Database
-    saved_chats = []
-    if supabase:
-        try:
-            res = supabase.table("chat_history").select("session_id, title, created_at").eq("user_email", user_email).order("created_at", desc=True).execute()
-            saved_chats = res.data
-        except Exception:
-            pass
-
-    if st.button(t["btn_new_chat"], type="secondary", use_container_width=True):
-        st.session_state.current_session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-        st.session_state.messages = []
-        st.rerun()
-
-    # Display list of past conversations
-    if "current_session_id" not in st.session_state:
-        st.session_state.current_session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-        st.session_state.messages = []
-
-    for chat in saved_chats:
-        chat_title = chat.get("title", f"Chat {chat['created_at'][:10]}")
-        if st.button(f"💬 {chat_title}", key=chat["session_id"], use_container_width=True):
-            st.session_state.current_session_id = chat["session_id"]
-            # Fetch message history for selected session
-            history_res = supabase.table("chat_messages").select("*").eq("session_id", chat["session_id"]).order("id", desc=False).execute()
-            st.session_state.messages = [{"role": row["role"], "content": row["content"]} for row in history_res.data]
-            st.rerun()
-
-# --- 5. MAIN CHAT INTERFACE ---
-st.title(t["title"])
-st.caption(t["caption"])
-st.markdown("---")
-
-# Render active session messages
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.write(msg["content"])
-
-st.markdown("---")
-
-# Input Controls
-input_mode_choice = st.radio(t["choose_mode"], [t["mode_voice"], t["mode_text"]])
-audio_file_input = None
-text_file_input = ""
-
-if input_mode_choice == t["mode_voice"]:
-    st.info(t["voice_info"])
-    audio_file_input = st.audio_input("Record Audio")
-else:
-    text_file_input = st.text_area("Question / Follow-up:", placeholder=t["text_placeholder"])
-
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
-
-if st.button(t["btn_submit"], type="primary"):
-    if not GEMINI_API_KEY:
-        st.error(t["err_key"])
-    elif input_mode_choice == t["mode_voice"] and not audio_file_input:
-        st.warning(t["err_voice"])
-    elif input_mode_choice == t["mode_text"] and not text_file_input.strip():
-        st.warning(t["err_text"])
-    else:
-        with st.spinner(t["spinner"]):
-            try:
-                genai.configure(api_key=GEMINI_API_KEY)
-                model = genai.GenerativeModel('gemini-1.5-flash')
-
-                system_instruction = f"You are Rythu Sahayakudu, an AI agriculture helper created by Yaswanth Chowdary. Respond directly in {selected_lang_name}."
-                
-                # Format context
-                history_prompt = system_instruction + "\n\nConversation Context:\n"
-                for m in st.session_state.messages:
-                    history_prompt += f"{m['role'].capitalize()}: {m['content']}\n"
-
-                if input_mode_choice == t["mode_voice"]:
-                    audio_bytes = audio_file_input.read()
-                    audio_data = {"mime_type": audio_file_input.type, "data": audio_bytes}
-                    response = model.generate_content([history_prompt, "Farmer's audio question:", audio_data])
-                    user_msg_text = "🎙️ [Voice Question Received]"
-                else:
-                    response = model.generate_content(f"{history_prompt}\nFarmer's query: {text_file_input}")
-                    user_msg_text = text_file_input
-
-                advice_text = response.text
-
-                # Save audio response
-                audio_filename = f"response_{len(st.session_state.messages)}.mp3"
-                try:
-                    tts = gTTS(text=advice_text, lang=lang_code, slow=False)
-                    tts.save(audio_filename)
-                except Exception:
-                    tts = gTTS(text=advice_text, lang="en", slow=False)
-                    tts.save(audio_filename)
-
-                # Save to Session State
-                st.session_state.messages.append({"role": "user", "content": user_msg_text})
-                st.session_state.messages.append({"role": "assistant", "content": advice_text})
-
-                # Save session and messages to Supabase DB
-                if supabase:
-                    # Upsert chat session header
-                    supabase.table("chat_history").upsert({
-                        "session_id": st.session_state.current_session_id,
-                        "user_email": user_email,
-                        "title": user_msg_text[:30] + "...",
-                        "created_at": datetime.now().isoformat()
-                    }).execute()
-
-                    # Save user & assistant messages
-                    supabase.table("chat_messages").insert([
-                        {"session_id": st.session_state.current_session_id, "role": "user", "content": user_msg_text},
-                        {"session_id": st.session_state.current_session_id, "role": "assistant", "content": advice_text}
-                    ]).execute()
-
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
-
-# Footer
-st.divider()
-st.markdown(t["footer"])
+    "Bengali (বাংলা)": {
+        "code": "bn",
+        "title": "🌾 কৃষক সহায়ক (Rythu Sahayakudu)",
+        "caption": f"স্বাগতম, **{user_name}** | প্রস্তুতকারক: **যশোবন্ত চৌধুরী**",
+        "choose_mode": "ইনপুট পদ্ধতি নির্বাচন করুন:",
+        "mode_voice": "🎙️ ভয়েস দ্বারা (বলুন)",
+        "mode_text": "✍️ টাইপ করে",
+        "voice_info": "মাইক বোতাম টিপে আপনার কৃষি প্রশ্ন বলুন:",
+        "text_placeholder": "আপনার কৃষি প্রশ্ন এখানে লিখুন...",
+        "btn_submit": "🤖 এআই পরামর্শ পান এবং শুনুন",
+        "btn_new_chat": "➕ নতুন কথোপকথন শুরু করুন",
+        "history_title": "📜 পূর্ববর্তী কথোপকথন",
+        "err_key": "Streamlit Secrets-এ GEMINI_API_KEY যোগ করুন!",
+        "err_voice": "দয়া করে প্রথমে আপনার প্রশ্ন রেকর্ড করুন!",
+        "err_text": "দয়া করে প্রথমে আপনার প্রশ্ন টাইপ করুন!",
+        "spinner": "এআই আপনার প্রশ্ন বিশ্লেষণ করছে...",
+        "footer": "© 2026 **যশোবন্ত চৌধুরী** | ভারতীয় কৃষকদের উদ্দেশ্যে উৎসর্গীকৃত"
+    },
+    "Tamil (தமிழ்)": {
+        "code": "ta",
+        "title": "🌾 உழவன் உதவியாளர் (Rythu Sahayakudu)",
+        "caption": f"வரவேற்கிறோம், **{user_name}** | உருவாக்கியவர்: **யஷ்வந்த் சவுத்ரி**",
+        "choose_mode": "உள்ளீட்டு முறையைத் தேர்ந்தெடுக்கவும்:",
+        "mode_voice": "🎙️ குரல் மூலம் (பேசவும்)",
+        "mode_text": "✍️ தட்டச்சு மூலம்",
+        "voice_info": "மைக்கை அழுத்தி உங்கள் விவசாயக் கேள்வியைப் பேசுங்கள்:",
+        "text_placeholder": "உங்கள் கேள்வியை இங்கே தட்டச்சு செய்யவும்...",
+        "btn_submit": "🤖 AI ஆலோசனையைப் பெற்று கேட்கவும்",
+        "btn_new_chat": "➕ புதிய உரையாடலைத் தொடங்கவும்",
+        "history_title": "📜 முந்தைய உரையாடல்கள்",
+        "err_key": "Streamlit Secrets இல் GEMINI_API_KEY ஐச் சேர்க்கவும்!",
+        "err_voice": "தயவுசெய்து முதலில் உங்கள் குரலைப் பதிவு செய்யவும்!",
+        "err_text": "தயவுசெய்து முதலில் உங்கள் கேள்வியைத் தட்டச்சு செய்யவும்!",
+        "spinner": "AI உங்கள் கேள்வியை பகுப்பாய்வு செய்கிறது...",
+        "footer": "© 2026 **யஷ்வந்த் சவுத்ரி** | இந்திய விவசாயிகளுக்கு அர்ப்பணிக்கப்பட்டது"
+    },
+    "Kannada (ಕನ್ನಡ)": {
+        "code": "kn",
+        "title": "🌾 ರೈತ ಸಹಾಯಕ (Rythu Sahayakudu)",
+        "caption": f"ಸ್ವಾಗತ, **{user_name}** | ರೂಪಿಸಿದವರು: **ಯಶವಂತ್ ಚೌಧರಿ**",
+        "choose_mode": "ಇನ್‌ಪುಟ್ ವಿಧಾನವನ್ನು ಆಯ್ಕೆಮಾಡಿ:",
+        "mode_voice": "🎙️️ ಧ್ವನಿ ಮೂಲಕ (ಮಾತನಾಡಿ)",
+        "mode_text": "✍️ ಟೈಪ್ ಮಾಡುವ ಮೂಲಕ",
+        "voice_info": "ಮೈಕ್ ಬಟನ್ ಒತ್ತಿ ನಿಮ್ಮ ಕೃಷಿ ಪ್ರಶ್ನೆಯನ್ನು ಮಾತನಾಡಿ:",
+        "text_placeholder": "ನಿಮ್ಮ ಕೃಷಿ ಪ್ರಶ್ನೆಯನ್ನು ಇಲ್ಲಿ ಟೈಪ್ ಮಾಡಿ...",
+        "btn_submit": "🤖 AI ಸಲಹೆ ಪಡೆಯಿರಿ ಮತ್ತು ಆಲಿಸಿ",
+        "btn_new_chat": "➕ ಹೊಸ ಸಂಭಾಷಣೆ ಪ್ರಾರಂಭಿಸಿ",
+        "history_title": "📜 ಹಿಂದಿನ ಸಂಭಾಷಣೆಗಳು",
+        "err_key": "Streamlit Secrets ನಲ್ಲಿ GEMINI_API_KEY ಸೇರಿಸಿ!",
+        "err_voice": "ದಯವಿಟ್ಟು ಮೊದಲು ನಿಮ್ಮ ಧ್ವನಿಯನ್ನು ರೆಕಾರ್ಡ್ ಮಾಡಿ!",
+        "err_text": "ದಯವಿಟ್ಟು ಮೊದಲು ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಟೈಪ್ ಮಾಡಿ!",
+        "spinner": "AI ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ವಿಶ್ಲೇಷಿಸುತ್ತಿದೆ...",
+        "footer": "© 2026 **ಯಶವಂತ್ ಚೌಧರಿ** | ಭಾರತೀಯ ರೈತರಿಗೆ ಅರ್ಪಿತ"
+    },
+    "Marathi (मराठी)": {
+        "code": "mr",
+        "title": "🌾 शेतकरी सहाय्यक (Rythu Sahayakudu)",
+        "caption": f"स्वागत आहे, **{user_name}** | डेव्हलपर: **यशवंत चौधरी**",
+        "choose_mode": "इनपुटची पद्धत निवडा:",
+        "mode_voice": "🎙️ आवाजाद्वारे (बोला)",
+        "mode_text": "✍️️ टाइप करून",
+        "voice_info": "माईक बटण दाबा आणि आपला शेतीविषयक प्रश्न बोला:",
+        "text_placeholder": "आपला शेतीविषयक प्रश्न येथे टाइप करा...",
+        "btn_submit": "🤖 एआय सल्ला मिळवा आणि ऐका",
+        "btn_new_chat": "➕ नवीन संभाषण सुरू करा",
+        "history_title": "📜 जुने संभाषण",
+        "err_key": "कृपया Streamlit Secrets मध्ये GEMINI_API_KEY जोडा!",
+        "err_voice": "कृपया आधी आपला आवाज रेकॉर्ड करा!",
+        "err_text": "कृपया आधी आपला प्रश्न टाइप करा!",
+        "spinner": "एआय आपल्या प्रश्नाचे विश्लेषण करत आहे...",
+        "footer": "© 2026 **यशवंत चौधरी** | भारतीय शेतकऱ्यांना समर्पित"
+    },
+    "Gujarati (ગુજરાતી)": {
+        "code": "gu",
+        "title": "🌾 ખેડૂત સહાયક (Rythu Sahayakudu)",
+        "caption": f"સ્વાગત છે, **{user_name}** | ડેવલપર: **યશવંત ચૌધરી**",
+        "choose_mode": "ઇનપુટ પદ્ધતિ પસંદ કરો:",
+        "mode_voice": "🎙️ અવાજ દ્વારા (બોલો)",
+        "mode_text": "✍️ ટાઇપ કરીને",
+        "voice_info": "માઇક બટન દબાવો અને તમારો કૃષિ પ્રશ્ન બોલો:",
+        "text_placeholder": "તમારો પ્રશ્ન અહીં ટાઇપ કરો...",
+        "btn_submit": "🤖 AI સલાહ મેળવો અને સાંભળો",
+        "btn_new_chat": "➕ નવી વાતચીત શરૂ કરો",
+        "history_title": "📜 અગાઉની વાતચીતો",
+        "err_key": "Streamlit Secrets માં GEMINI_API_KEY ઉમેરો!",
+        "err_voice": "કૃપા કરીને પહેલા તમારો અવાજ રેકોર્ડ કરો!",
+        "err_text": "કૃપા કરીને પહેલા તમારો પ્રશ્ન ટાઇપ કરો!",
+        "spinner": "AI તમારા પ્રશ્નનું વિશ્લેષણ કરી રહ્યું છે...",
+        "footer": "© 2026 **યશવંત ચૌધરી** | ભારતીય ખેડૂતોને સમર્પિત"
+    },
+    "Malayalam (മലയാളം)": {
+        "code": "ml",
+        "title": "🌾 കർഷക സഹായി (Rythu Sahayakudu)",
+        "caption": f"സ്വാഗതം, **{user_name}** | നിർമ്മാതാവ്: **യശവന്ത് ചൗധരി**",
+        "choose_mode": "ഇൻപുട്ട് രീതി തിരഞ്ഞെടുക്കുക:",
+        "mode_voice": "🎙️ ശബ്ദത്തിലൂടെ (സംസാരിക്കുക)",
+        "mode_text": "✍️ ടൈപ്പ് ചെയ്തുകൊണ്ട്",
+        "voice_info": "മൈക്ക് ബട്ടൺ അമർത്തി നിങ്ങളുടെ കാർഷിക ചോദ്യം ചോദിക്കുക:",
+        "text_placeholder": "നിങ്ങളുടെ ചോദ്യം ഇവിടെ ടൈപ്പ് ചെയ്യുക...",
+        "btn_submit": "🤖 AI ഉപദേശം നേടുക & കേൾക്കുക",
+        "btn_new_chat": "➕ പുതിയ സംഭാഷണം ആരംഭിക്കുക",
+        "history_title": "📜 മുൻ സംഭാഷണങ്ങൾ",
+        "err_key": "Streamlit Secrets-ൽ GEMINI_API_KEY ചേർക്കുക!",
+        "err_voice": "ദയവായി ആദ്യം നിങ്ങളുടെ ശബ്ദം റെക്കോർഡ് ചെയ്യുക!",
+        "err_text": "ദയവായി ആദ്യം നിങ്ങളുടെ ചോദ്യം ടൈപ്പ് ചെയ്യുക!",
+        "spinner": "AI നിങ്ങളുടെ ചോദ്യം വിശകലനം ചെയ്യുന്നു...",
+        "footer": "© 2026 **യശവന്ത് ചൗധരി** | ഇന്ത്യൻ കർഷകർക്കായി സമർപ്പിക്കുന്നു"
+    },
+    "Punjabi (ਪੰਜਾਬੀ)": {
+        "code": "pa",
+        "title": "🌾 ਕਿਸਾਨ ਸਹਾਇਕ (Rythu Sahayakudu)",
+        "caption": f"ਜੀ ਆਇਆਂ ਨੂੰ, **{user_name}** | ਡਿਵੈਲਪਰ: **ਯਸ਼ਵੰਤ ਚੌਧਰੀ**",
+        "choose_mode": "ਇਨਪੁਟ ਦਾ ਤਰੀਕਾ ਚੁਣੋ:",
+        "mode_voice": "🎙️ ਆਵਾਜ਼ ਰਾਹੀਂ (ਬੋਲੋ)",
+        "mode_text": "✍️ ਟਾਈਪ ਕਰਕੇ",
+        "voice_info": "ਮਾਈਕ ਬਟਨ ਦਬਾਓ ਅਤੇ ਆਪਣਾ ਖੇਤੀਬਾੜੀ ਸਵਾਲ ਬੋਲੋ:",
+        "text_placeholder": "ਆਪਣਾ ਖੇਤੀਬਾੜੀ ਸਵਾਲ ਇੱਥੇ ਟਾਈਪ ਕਰੋ...",
+        "btn_submit": "🤖 AI ਸਲਾਹ ਪ੍ਰਾਪਤ ਕਰੋ ਅਤੇ ਸੁਣੋ",
+        "btn_new_chat": "➕ ਨਵੀਂ ਗੱਲਬਾਤ ਸ਼ੁਰੂ ਕਰੋ",
+        "history_title": "📜 ਪਿਛਲੀ ਗੱਲਬਾਤ",
+        "err_key": "ਕਿਰਪਾ ਕਰਕੇ Streamlit Secrets ਵਿੱਚ GEMINI_API_KEY ਜੋੜੋ!",
+        "err_voice": "ਕਿਰਪਾ ਕਰਕੇ ਪਹਿਲਾਂ ਆਪਣੀ ਆਵਾਜ਼ ਰਿਕਾਰਡ ਕਰੋ!",
+        "
